@@ -136,7 +136,8 @@ def sadtalker_demo():
                             preprocess_type,
                             is_still_mode,
                             enhancer], 
-                    outputs=[gen_video]
+                    outputs=[gen_video],
+                    api_name='sad_talker'
                     )
 
     return sadtalker_interface

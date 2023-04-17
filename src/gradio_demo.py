@@ -54,6 +54,20 @@ class SadTalker():
             self.audio_to_coeff = Audio2Coeff(self.audio2pose_checkpoint, self.audio2pose_yaml_path, 
                                     self.audio2exp_checkpoint, self.audio2exp_yaml_path, self.wav2lip_checkpoint, self.device)
 
+
+            self.mapping_checkpoint_full = os.path.join(self.checkpoint_path, 'mapping_00109-model.pth.tar')
+            self.facerender_yaml_path_full = os.path.join(self.config_path, 'facerender_still.yaml')
+
+            
+            self.animate_from_coeff_full = AnimateFromCoeff(self.free_view_checkpoint, self.mapping_checkpoint_full, 
+                                                self.facerender_yaml_path_full, self.device)
+
+            self.mapping_checkpoint = os.path.join(self.checkpoint_path, 'mapping_00229-model.pth.tar')
+            self.facerender_yaml_path = os.path.join(self.config_path, 'facerender.yaml')
+
+            self.animate_from_coeff = AnimateFromCoeff(self.free_view_checkpoint, self.mapping_checkpoint, 
+                                                self.facerender_yaml_path, self.device)
+
     def test(self, source_image, driven_audio, preprocess='crop', still_mode=False, use_enhancer=False, result_dir='./results/'):
 
         ### crop: only model,
@@ -77,6 +91,7 @@ class SadTalker():
             print(self.free_view_checkpoint)
             self.animate_from_coeff = AnimateFromCoeff(self.free_view_checkpoint, self.mapping_checkpoint, 
                                                 self.facerender_yaml_path, self.device)
+
 
         time_tag = str(uuid.uuid4())
         save_dir = os.path.join(result_dir, time_tag)
@@ -118,7 +133,12 @@ class SadTalker():
         #coeff2video
         batch_size = 2
         data = get_facerender_data(coeff_path, crop_pic_path, first_coeff_path, audio_path, batch_size, still_mode=still_mode, preprocess=preprocess)
-        return_path = self.animate_from_coeff.generate(data, save_dir,  pic_path, crop_info, enhancer='gfpgan' if use_enhancer else None, preprocess=preprocess)
+        
+        if preprocess == 'full': 
+            return_path = self.animate_from_coeff_full.generate(data, save_dir,  pic_path, crop_info, enhancer='gfpgan' if use_enhancer else None, preprocess=preprocess)
+        else:
+            return_path = self.animate_from_coeff.generate(data, save_dir,  pic_path, crop_info, enhancer='gfpgan' if use_enhancer else None, preprocess=preprocess)
+        
         video_name = data['video_name']
         print(f'The generated video is named {video_name} in {save_dir}')
 
@@ -126,6 +146,7 @@ class SadTalker():
             del self.preprocess_model
             del self.audio_to_coeff
             del self.animate_from_coeff
+            del self.animate_from_coeff_full
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()

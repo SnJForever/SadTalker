@@ -3,6 +3,8 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from tqdm import tqdm 
+import time
+import threading
 
 def normalize_kp(kp_source, kp_driving, kp_driving_initial, adapt_movement_scale=False,
                  use_relative_movement=False, use_relative_jacobian=False):
@@ -98,19 +100,24 @@ def keypoint_transformation(kp_canonical, he, wo_exp=False):
     return {'value': kp_transformed}
 
 
-
 def make_animation(source_image, source_semantics, target_semantics,
                             generator, kp_detector, he_estimator, mapping, 
                             yaw_c_seq=None, pitch_c_seq=None, roll_c_seq=None,
                             use_exp=True):
+    threads=[]
+
+    #设置总线程个数
+    total_thread_num=50                            
     with torch.no_grad():
         predictions = []
 
         kp_canonical = kp_detector(source_image)
         he_source = mapping(source_semantics)
         kp_source = keypoint_transformation(kp_canonical, he_source)
-    
-        for frame_idx in tqdm(range(target_semantics.shape[1]), 'Face Renderer:'):
+        
+        result_list = []
+
+        def ThFun(frame_idx,target_semantics,mapping,yaw_c_seq,pitch_c_seq,roll_c_seq,kp_canonical,generator,source_image,kp_source):
             target_semantics_frame = target_semantics[:, frame_idx]
             he_driving = mapping(target_semantics_frame)
             if yaw_c_seq is not None:
@@ -122,21 +129,86 @@ def make_animation(source_image, source_semantics, target_semantics,
             
             kp_driving = keypoint_transformation(kp_canonical, he_driving)
                 
-            #kp_norm = normalize_kp(kp_source=kp_source, kp_driving=kp_driving,
-                                   #kp_driving_initial=kp_driving_initial)
             kp_norm = kp_driving
             out = generator(source_image, kp_source=kp_source, kp_driving=kp_norm)
-            '''
-            source_image_new = out['prediction'].squeeze(1)
-            kp_canonical_new =  kp_detector(source_image_new)
-            he_source_new = he_estimator(source_image_new) 
-            kp_source_new = keypoint_transformation(kp_canonical_new, he_source_new, wo_exp=True)
-            kp_driving_new = keypoint_transformation(kp_canonical_new, he_driving, wo_exp=True)
-            out = generator(source_image_new, kp_source=kp_source_new, kp_driving=kp_driving_new)
-            '''
-            predictions.append(out['prediction'])
+            result_list.append((frame_idx,out['prediction'])) 
+
+        for frame_idx in tqdm(range(target_semantics.shape[1]), 'Face Renderer:'):
+            while(True):
+                current_thread_num = 0
+                for thread in threads:
+                    if thread.isAlive():
+                        current_thread_num += 1
+                    
+                if (current_thread_num >= total_thread_num ):
+                    time.sleep(0.1)
+                    continue
+                else:
+                    break
+            
+            current_thread = threading.Thread(target = ThFun, args = (frame_idx,target_semantics,mapping,yaw_c_seq,pitch_c_seq,roll_c_seq,kp_canonical,generator,source_image,kp_source))
+            current_thread.start()
+            threads.append(current_thread)    
+
+        while(True):
+            current_thread_num = 0
+            for thread in threads:
+                if thread.isAlive():
+                    current_thread_num += 1
+
+            if (current_thread_num == 0 ):
+                break
+            else:
+                continue
+
+        def take_first(elem):
+            return elem[0]
+
+        print(result_list)
+        result_list.sort(key=take_first)
+        print(result_list)
+        predictions = [i[1] for i in result_list]    
         predictions_ts = torch.stack(predictions, dim=1)
     return predictions_ts
+
+# def make_animation(source_image, source_semantics, target_semantics,
+#                             generator, kp_detector, he_estimator, mapping, 
+#                             yaw_c_seq=None, pitch_c_seq=None, roll_c_seq=None,
+#                             use_exp=True):
+#     with torch.no_grad():
+#         predictions = []
+
+#         kp_canonical = kp_detector(source_image)
+#         he_source = mapping(source_semantics)
+#         kp_source = keypoint_transformation(kp_canonical, he_source)
+    
+#         for frame_idx in tqdm(range(target_semantics.shape[1]), 'Face Renderer:'):
+#             target_semantics_frame = target_semantics[:, frame_idx]
+#             he_driving = mapping(target_semantics_frame)
+#             if yaw_c_seq is not None:
+#                 he_driving['yaw_in'] = yaw_c_seq[:, frame_idx]
+#             if pitch_c_seq is not None:
+#                 he_driving['pitch_in'] = pitch_c_seq[:, frame_idx] 
+#             if roll_c_seq is not None:
+#                 he_driving['roll_in'] = roll_c_seq[:, frame_idx] 
+            
+#             kp_driving = keypoint_transformation(kp_canonical, he_driving)
+                
+#             #kp_norm = normalize_kp(kp_source=kp_source, kp_driving=kp_driving,
+#                                    #kp_driving_initial=kp_driving_initial)
+#             kp_norm = kp_driving
+#             out = generator(source_image, kp_source=kp_source, kp_driving=kp_norm)
+#             '''
+#             source_image_new = out['prediction'].squeeze(1)
+#             kp_canonical_new =  kp_detector(source_image_new)
+#             he_source_new = he_estimator(source_image_new) 
+#             kp_source_new = keypoint_transformation(kp_canonical_new, he_source_new, wo_exp=True)
+#             kp_driving_new = keypoint_transformation(kp_canonical_new, he_driving, wo_exp=True)
+#             out = generator(source_image_new, kp_source=kp_source_new, kp_driving=kp_driving_new)
+#             '''
+#             predictions.append(out['prediction'])
+#         predictions_ts = torch.stack(predictions, dim=1)
+#     return predictions_ts
 
 class AnimateModel(torch.nn.Module):
     """

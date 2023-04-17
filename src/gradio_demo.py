@@ -67,16 +67,16 @@ class SadTalker():
             self.audio_to_coeff = Audio2Coeff(self.audio2pose_checkpoint, self.audio2pose_yaml_path, 
                                     self.audio2exp_checkpoint, self.audio2exp_yaml_path, self.wav2lip_checkpoint, self.device)
         
-        if preprocess == 'full': 
-            self.mapping_checkpoint = os.path.join(self.checkpoint_path, 'mapping_00109-model.pth.tar')
-            self.facerender_yaml_path = os.path.join(self.config_path, 'facerender_still.yaml')
-        else:
-            self.mapping_checkpoint = os.path.join(self.checkpoint_path, 'mapping_00229-model.pth.tar')
-            self.facerender_yaml_path = os.path.join(self.config_path, 'facerender.yaml')
+            if preprocess == 'full': 
+                self.mapping_checkpoint = os.path.join(self.checkpoint_path, 'mapping_00109-model.pth.tar')
+                self.facerender_yaml_path = os.path.join(self.config_path, 'facerender_still.yaml')
+            else:
+                self.mapping_checkpoint = os.path.join(self.checkpoint_path, 'mapping_00229-model.pth.tar')
+                self.facerender_yaml_path = os.path.join(self.config_path, 'facerender.yaml')
 
-        print(self.free_view_checkpoint)
-        self.animate_from_coeff = AnimateFromCoeff(self.free_view_checkpoint, self.mapping_checkpoint, 
-                                            self.facerender_yaml_path, self.device)
+            print(self.free_view_checkpoint)
+            self.animate_from_coeff = AnimateFromCoeff(self.free_view_checkpoint, self.mapping_checkpoint, 
+                                                self.facerender_yaml_path, self.device)
 
         time_tag = str(uuid.uuid4())
         save_dir = os.path.join(result_dir, time_tag)

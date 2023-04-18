@@ -111,7 +111,7 @@ def make_animation(source_image, source_semantics, target_semantics,
     if os.environ["THREAD_NUM"]: 
         total_thread_num = int(os.environ["THREAD_NUM"])
     else: 
-        total_thread_num = 10             
+        total_thread_num = 5            
     with torch.no_grad():
         predictions = []
 
@@ -121,36 +121,28 @@ def make_animation(source_image, source_semantics, target_semantics,
         
         result_list = []
 
-        def ThFun(frame_idx,target_semantics,mapping,yaw_c_seq,pitch_c_seq,roll_c_seq,kp_canonical,generator,source_image,kp_source):
-            target_semantics_frame = target_semantics[:, frame_idx]
-            he_driving = mapping(target_semantics_frame)
-            if yaw_c_seq is not None:
-                he_driving['yaw_in'] = yaw_c_seq[:, frame_idx]
-            if pitch_c_seq is not None:
-                he_driving['pitch_in'] = pitch_c_seq[:, frame_idx] 
-            if roll_c_seq is not None:
-                he_driving['roll_in'] = roll_c_seq[:, frame_idx] 
-            
-            kp_driving = keypoint_transformation(kp_canonical, he_driving)
+        def ThFun(start, stop,target_semantics,mapping,yaw_c_seq,pitch_c_seq,roll_c_seq,kp_canonical,generator,source_image,kp_source):
+            for frame_idx in range(start, stop):
+                target_semantics_frame = target_semantics[:, frame_idx]
+                he_driving = mapping(target_semantics_frame)
+                if yaw_c_seq is not None:
+                    he_driving['yaw_in'] = yaw_c_seq[:, frame_idx]
+                if pitch_c_seq is not None:
+                    he_driving['pitch_in'] = pitch_c_seq[:, frame_idx] 
+                if roll_c_seq is not None:
+                    he_driving['roll_in'] = roll_c_seq[:, frame_idx] 
                 
-            kp_norm = kp_driving
-            out = generator(source_image, kp_source=kp_source, kp_driving=kp_norm)
-            result_list.append((frame_idx,out['prediction'])) 
-
-        for frame_idx in tqdm(range(target_semantics.shape[1]), 'Face Renderer:'):
-            while(True):
-                current_thread_num = 0
-                for thread in threads:
-                    if thread.isAlive():
-                        current_thread_num += 1
+                kp_driving = keypoint_transformation(kp_canonical, he_driving)
                     
-                if (current_thread_num >= total_thread_num ):
-                    time.sleep(0.1)
-                    continue
-                else:
-                    break
-            
-            current_thread = threading.Thread(target = ThFun, args = (frame_idx,target_semantics,mapping,yaw_c_seq,pitch_c_seq,roll_c_seq,kp_canonical,generator,source_image,kp_source))
+                kp_norm = kp_driving
+                out = generator(source_image, kp_source=kp_source, kp_driving=kp_norm)
+                result_list.append((frame_idx,out['prediction'])) 
+
+        total_num = target_semantics.shape[1]
+        step = int(total_num/total_thread_num)
+        for start in tqdm(range(0,total_num,step), 'Face Renderer:'):
+            stop = start + step if start + step <= total_num else total_num
+            current_thread = threading.Thread(target = ThFun, args = (start,stop,target_semantics,mapping,yaw_c_seq,pitch_c_seq,roll_c_seq,kp_canonical,generator,source_image,kp_source))
             current_thread.start()
             threads.append(current_thread)    
 
@@ -163,6 +155,7 @@ def make_animation(source_image, source_semantics, target_semantics,
             if (current_thread_num == 0 ):
                 break
             else:
+                time.sleep(1)
                 continue
 
         def take_first(elem):

@@ -5,6 +5,7 @@ import numpy as np
 from tqdm import tqdm 
 import time
 import threading
+import os
 
 def normalize_kp(kp_source, kp_driving, kp_driving_initial, adapt_movement_scale=False,
                  use_relative_movement=False, use_relative_jacobian=False):
@@ -107,7 +108,10 @@ def make_animation(source_image, source_semantics, target_semantics,
     threads=[]
 
     #设置总线程个数
-    total_thread_num=50                            
+    if os.environ["THREAD_NUM"]: 
+        total_thread_num = int(os.environ["THREAD_NUM"])
+    else: 
+        total_thread_num = 10             
     with torch.no_grad():
         predictions = []
 
@@ -155,7 +159,7 @@ def make_animation(source_image, source_semantics, target_semantics,
             for thread in threads:
                 if thread.isAlive():
                     current_thread_num += 1
-
+            print('current_thread_num：',current_thread_num)
             if (current_thread_num == 0 ):
                 break
             else:
@@ -164,9 +168,9 @@ def make_animation(source_image, source_semantics, target_semantics,
         def take_first(elem):
             return elem[0]
 
-        print(result_list)
+        # print(result_list)
         result_list.sort(key=take_first)
-        print(result_list)
+        # print(result_list)
         predictions = [i[1] for i in result_list]    
         predictions_ts = torch.stack(predictions, dim=1)
     return predictions_ts

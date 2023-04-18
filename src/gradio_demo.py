@@ -7,6 +7,9 @@ from src.generate_batch import get_data
 from src.generate_facerender_batch import get_facerender_data
 
 from pydub import AudioSegment
+import time
+import datetime
+
 
 def mp3_to_wav(mp3_filename,wav_filename,frame_rate):
     mp3_file = AudioSegment.from_file(file=mp3_filename)
@@ -69,7 +72,8 @@ class SadTalker():
                                                 self.facerender_yaml_path, self.device)
 
     def test(self, source_image, driven_audio, preprocess='crop', still_mode=False, use_enhancer=False, result_dir='./results/'):
-
+        start_time = datetime.datetime.now()
+        print('start time:',start_time)
         ### crop: only model,
 
         if self.lazy_load:
@@ -154,6 +158,10 @@ class SadTalker():
             
         import gc; gc.collect()
         
+
+        end_time = datetime.datetime.now()
+        print('end_time time:',end_time)
+        print('total use time:',end_time - start_time)
         return return_path
 
     
